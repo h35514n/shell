@@ -407,6 +407,17 @@ esac
 "
 }
 
+write_tmux_conf_shim() {
+  local path="${HOME}/.tmux.conf"
+  backup_if_needed "${path}"
+  log "Writing ${path}"
+  write_file "${path}" "\
+${SHIM_MARKER}
+set-environment -g SHELL_CONFIG_DIR \"${SHELL_CONFIG_DIR}\"
+source-file \"${SHELL_CONFIG_DIR}/tmux.conf\"
+"
+}
+
 configure_gitconfig_include() {
   local repo_gitconfig="${SHELL_CONFIG_DIR}/gitconfig"
   local existing
@@ -470,6 +481,7 @@ if [ "${WRITE_SHIMS}" = "1" ]; then
   write_zshenv_shim
   write_zshrc_shim
   write_bashrc_shim
+  write_tmux_conf_shim
 
   log "Configuring ~/.gitconfig include"
   configure_gitconfig_include

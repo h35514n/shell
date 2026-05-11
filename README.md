@@ -60,19 +60,21 @@ The script supports Debian/Ubuntu via `apt-get` and Red
 Hat/Amazon/Fedora style hosts via `yum` or `dnf`. It installs the base
 CLI dependencies and writes shim files into `$HOME`:
 
-- `~/.shell-config.env` --- the shared core. Exports `SHELL_CONFIG_DIR`
-  and `DOTFILES_DIR` and prepends `${SHELL_CONFIG_DIR}/git` and
-  `${SHELL_CONFIG_DIR}/tmux` to `PATH` (idempotently).
-- `~/.zshenv`, `~/.bashrc` --- source `~/.shell-config.env` and then
-  `source` the repo's reference `zshenv`/`bashrc`.
+- `~/.zshenv`, `~/.bashrc` --- export `SHELL_CONFIG_DIR`,
+  `DOTFILES_DIR`, prepend `${SHELL_CONFIG_DIR}/git` and
+  `${SHELL_CONFIG_DIR}/tmux` to `PATH` (idempotently), and then
+  `source` the repo's reference file (when present).
 - `~/.zshrc` --- sources the repo's `zshrc` (env already set by
   `.zshenv`).
+- `~/.tmux.conf` --- runs `set-environment -g SHELL_CONFIG_DIR ...`
+  and `source-file` the repo's `tmux.conf`. tmux expands
+  `${SHELL_CONFIG_DIR}` when loading plugins from `share/`.
 - `~/.gitconfig` --- receives a `[include] path = ...` entry via
   `git config --global --add include.path` so the repo's `gitconfig` is
   merged on top of whatever the host already has (existing `user.name`,
   `user.email`, etc. are preserved).
 
-Existing shell rc files that are not already shims get backed up to
+Existing rc files that are not already shims get backed up to
 `.bak.YYYYMMDDHHMMSS` before being replaced. Re-running `script/setup`
 detects its own marker comment and regenerates in place without piling
 up backups.
@@ -88,11 +90,11 @@ Manual Setup
 ------------
 
 Install the base packages with your package manager
-(`bash zsh tmux git curl fzf ripgrep bat`), then create the shims
+(`bash zsh tmux git curl fzf ripgrep bat eza`), then create the shims
 yourself, replacing `/abs/path/to/shell` with the absolute path to this
-checkout. Start with the shared core:
+checkout.
 
-`~/.shell-config.env`:
+`~/.zshenv`:
 
 ``` sh
 export SHELL_CONFIG_DIR="/abs/path/to/shell"
@@ -101,12 +103,6 @@ case ":$PATH:" in
   *":$SHELL_CONFIG_DIR/git:"*) ;;
   *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$PATH" ;;
 esac
-```
-
-`~/.zshenv`:
-
-``` sh
-. "$HOME/.shell-config.env"
 [ -r "$SHELL_CONFIG_DIR/zshenv" ] && . "$SHELL_CONFIG_DIR/zshenv"
 ```
 
@@ -119,8 +115,20 @@ esac
 `~/.bashrc`:
 
 ``` sh
-. "$HOME/.shell-config.env"
+export SHELL_CONFIG_DIR="/abs/path/to/shell"
+export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
+case ":$PATH:" in
+  *":$SHELL_CONFIG_DIR/git:"*) ;;
+  *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$PATH" ;;
+esac
 [ -r "$SHELL_CONFIG_DIR/bashrc" ] && . "$SHELL_CONFIG_DIR/bashrc"
+```
+
+`~/.tmux.conf`:
+
+``` tmux
+set-environment -g SHELL_CONFIG_DIR "/abs/path/to/shell"
+source-file "/abs/path/to/shell/tmux.conf"
 ```
 
 Include the repo's `gitconfig` into the host's `~/.gitconfig`:
@@ -155,6 +163,13 @@ Tmux helpers (live in `tmux/`, on `$PATH` via the shims):
 - `tmux-attach-or-create`: attach to a session named after the cwd or
   create it
 - `mx-fzf-preview`: fzf preview helper used by `mx`
+
+The `tmux.conf` shipped with this repo rebinds the prefix to `Ctrl-a`
+(default is `Ctrl-b`) and uses tpm + the vendored plugins under
+`share/` --- on first launch hit `prefix + I` so tpm wires the plugins
+in (`tmux-prefix-highlight`, `tmux-copycat`, etc.) from the manifest.
+`bind-key N` calls an external `random-phrase` command to rename the
+session; install it separately or rebind to taste.
 
 Notes
 -----
