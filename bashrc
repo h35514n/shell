@@ -12,10 +12,10 @@
 # shellcheck source=/dev/null
 source "${HOME}/.dotfiles/env/setup.sh"
 
-#-------------------------------------------------------------
-# ALIASES
-#-------------------------------------------------------------
-alias bash="bash --init-file=${XDG_CONFIG_HOME}/bash/bashrc"
+# Shared portable config (aliases, exports, simple functions) also sourced
+# from zshrc.
+# shellcheck source=/dev/null
+. "${SHELL_CONFIG_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)}/env.sh"
 
 #-------------------------------------------------------------
 # GIT PROMPT

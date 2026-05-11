@@ -3,6 +3,7 @@
 # Table of Contents
 # -----------------
 # 1. Shellcheck Directives
+#    (Portable aliases, exports, and helpers are extracted to env.sh.)
 # 2. Aliases
 #    2.1 File Management and Navigation
 #    2.2 Safeguards
@@ -43,31 +44,13 @@
 # shellcheck disable=SC1090,SC2139
 # SC1090: Can't follow non-constant source. Use a directive to specify location.
 
+# Shared portable config (aliases, exports, simple functions). Anything that
+# also works in bash lives there and is sourced from bashrc too.
+. "${SHELL_CONFIG_DIR:-${0:A:h}}/env.sh"
+
 # 2. Aliases
 # ----------
-# Aliases are grouped by category for easier maintenance. They enhance common commands
-# with safety features, modern alternatives (e.g., eza for ls, bat for cat), and shortcuts.
-
-# 2.1 File Management and Navigation
-alias ..='cd ..; l'         # Go to parent directory and list contents
-alias ...='cd ../..; l'     # Go to grandparent directory and list contents
-alias mkdir='mkdir -p'      # Create directories recursively
-alias h='history'           # Show command history
-alias dirs='dirs -v'        # Show directory stack with indices
-alias ls='eza --group-directories-first --time-style=long-iso --classify'  # Modern ls replacement with grouping and classification
-alias l='ls'                # Short alias for ls
-alias la='ls -a'            # List all files (including hidden)
-alias ld='ls -d .*'         # List hidden directories only
-alias ll='ls -l'            # Long listing
-alias lla='ls -al'          # Long listing including hidden
-alias lld='ls -al -d .*'    # Long listing of hidden files/directories
-alias lt='eza --tree --level=3'  # Tree view up to 3 levels
-
-# 2.2 Safeguards
-alias rm='trash'            # Move to trash instead of deleting
-alias mv='mv -i'            # Prompt before overwriting on move
-alias cp='cp -i'            # Prompt before overwriting on copy
-alias ln='ln -iv'           # Verbose linking with error if link exists
+# Zsh-only aliases. Portable aliases live in env.sh.
 
 # 2.3 Postfix (Suffix Aliases)
 # These are global aliases (-g) that can be appended to any command for piping.
@@ -75,48 +58,9 @@ alias -g G='| grep --line-number --context=1'  # Grep with line numbers and 1 li
 alias -g C='| pbcopy'       # Copy output to clipboard
 alias -g P='| less'         # Pipe to pager
 
-# 2.4 Highlighting and XDG Compliance
-alias wget="wget --hsts-file=${XDG_CACHE_HOME}/wget/history"  # Use XDG cache for wget history
-alias bash="bash --init-file ${XDG_CONFIG_HOME}/bash/bashrc"  # Load XDG-compliant bashrc
-
-# 2.5 Miscellaneous
-alias resign-xcode="sudo codesign -f -s ${USER} /Applications/Xcode.app"  # Re-sign Xcode
-alias pp='pretty-print-path'  # Pretty-print PATH variable
-alias b='bundle'              # Shortcut for bundle (Ruby)
-
-alias vi='vim -u $XDG_CONFIG_HOME/vim/vimrc.minimal.vim'  # Vim with minimal config
-alias vin='vim -u NONE'      # Vim with no config
-
-# 3. Environment Variables
-# ------------------------
-# Set defaults for editor, pager, and less behavior.
-
-# 3.1 Editor and Pager
-export EDITOR="ed"
-export PAGER="less"
-export LESSOPEN="| src-hilite-lesspipe.sh %s"  # Syntax highlighting for less
-export LESS=' --no-init --RAW-CONTROL-CHARS --quit-if-one-screen '  # Less options: no init, raw chars, quit if one screen
-
 # 4. Functions
 # ------------
 # Custom functions for common tasks, git status parsing, and prompt building.
-
-# 4.1 Directory Creation and Navigation
-# Create a directory (replacing spaces with hyphens) and cd into it.
-md() {
-  local directory_name="${*// /-}"
-  mkdir -p "${directory_name}"
-  cd "${directory_name}" || return
-}
-
-# 4.2 File Creation
-# Create an executable bin file, make it executable, and open in editor.
-mkbin() {
-  local file="${DOTFILES_DIR}/bin/${1}"
-  touch "$file"
-  chmod u+x "$file"
-  edit "$file"
-}
 
 # 4.3 Diff Utility
 # Colorized diff using delta.

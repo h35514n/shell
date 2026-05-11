@@ -39,12 +39,15 @@ script/setup --with-language-tools
 
 The script supports Debian/Ubuntu via `apt-get` and Red
 Hat/Amazon/Fedora style hosts via `yum` or `dnf`. It installs the base
-CLI dependencies and writes four shim files into `$HOME`:
+CLI dependencies and writes shim files into `$HOME`:
 
-- `~/.zshenv`, `~/.zshrc`, `~/.bashrc` --- small wrappers that export
-  `SHELL_CONFIG_DIR`, `DOTFILES_DIR`, prepend `${SHELL_CONFIG_DIR}/git`
-  and `${SHELL_CONFIG_DIR}/tmux` to `PATH`, and then `source` the repo's
-  reference config.
+- `~/.shell-config.env` --- the shared core. Exports `SHELL_CONFIG_DIR`
+  and `DOTFILES_DIR` and prepends `${SHELL_CONFIG_DIR}/git` and
+  `${SHELL_CONFIG_DIR}/tmux` to `PATH` (idempotently).
+- `~/.zshenv`, `~/.bashrc` --- source `~/.shell-config.env` and then
+  `source` the repo's reference `zshenv`/`bashrc`.
+- `~/.zshrc` --- sources the repo's `zshrc` (env already set by
+  `.zshenv`).
 - `~/.gitconfig` --- receives a `[include] path = ...` entry via
   `git config --global --add include.path` so the repo's `gitconfig` is
   merged on top of whatever the host already has (existing `user.name`,
@@ -66,17 +69,25 @@ Manual Setup
 ------------
 
 Install the base packages with your package manager
-(`bash zsh tmux git curl fzf ripgrep bat`), then create the four shims
+(`bash zsh tmux git curl fzf ripgrep bat`), then create the shims
 yourself, replacing `/abs/path/to/shell` with the absolute path to this
-checkout:
+checkout. Start with the shared core:
 
-`~/.zshenv`:
+`~/.shell-config.env`:
 
 ``` sh
 export SHELL_CONFIG_DIR="/abs/path/to/shell"
 export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
-path=("$SHELL_CONFIG_DIR/git" "$SHELL_CONFIG_DIR/tmux" $path)
-export PATH
+case ":$PATH:" in
+  *":$SHELL_CONFIG_DIR/git:"*) ;;
+  *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$PATH" ;;
+esac
+```
+
+`~/.zshenv`:
+
+``` sh
+. "$HOME/.shell-config.env"
 [ -r "$SHELL_CONFIG_DIR/zshenv" ] && . "$SHELL_CONFIG_DIR/zshenv"
 ```
 
@@ -89,9 +100,7 @@ export PATH
 `~/.bashrc`:
 
 ``` sh
-export SHELL_CONFIG_DIR="/abs/path/to/shell"
-export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
-export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$PATH"
+. "$HOME/.shell-config.env"
 [ -r "$SHELL_CONFIG_DIR/bashrc" ] && . "$SHELL_CONFIG_DIR/bashrc"
 ```
 
