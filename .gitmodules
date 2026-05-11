@@ -1,0 +1,27 @@
+[submodule "share/zsh-autosuggestions"]
+	path = share/zsh-autosuggestions
+	url = https://github.com/zsh-users/zsh-autosuggestions.git
+[submodule "share/zsh-syntax-highlighting"]
+	path = share/zsh-syntax-highlighting
+	url = https://github.com/zsh-users/zsh-syntax-highlighting.git
+[submodule "share/fzf"]
+	path = share/fzf
+	url = https://github.com/junegunn/fzf.git
+[submodule "share/tpm"]
+	path = share/tpm
+	url = https://github.com/tmux-plugins/tpm.git
+[submodule "share/tmux-open"]
+	path = share/tmux-open
+	url = https://github.com/tmux-plugins/tmux-open.git
+[submodule "share/tmux-prefix-highlight"]
+	path = share/tmux-prefix-highlight
+	url = https://github.com/tmux-plugins/tmux-prefix-highlight.git
+[submodule "share/tmux-urlview"]
+	path = share/tmux-urlview
+	url = https://github.com/tmux-plugins/tmux-urlview.git
+[submodule "share/pd"]
+	path = share/pd
+	url = https://github.com/h35514n/pd.git
+[submodule "share/zsh-vim-mode"]
+	path = share/zsh-vim-mode
+	url = https://github.com/softmoth/zsh-vim-mode
