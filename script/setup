@@ -122,7 +122,6 @@ BASE_APT_PACKAGES=(
   bat
   ca-certificates
   curl
-  fzf
   git
   ripgrep
   tmux
@@ -147,7 +146,6 @@ BASE_DNF_PACKAGES=(
   bat
   ca-certificates
   curl
-  fzf
   git
   ripgrep
   tmux
