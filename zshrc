@@ -206,22 +206,26 @@ setopt SHARE_HISTORY          # Share history across sessions
 # - zsh-vim-mode (unless in emacs)
 # - kitty shell integration (if in kitty)
 # - iterm2 shell integration (if in iterm2)
+#
+# Plugins are vendored as git submodules under ${SHELL_CONFIG_DIR}/share/*.
+# Clone the repo with `--recurse-submodules` (or run
+# `git submodule update --init --recursive`) before first use.
 
-if [[ -d "${XDG_DATA_HOME}/zsh/zsh-autosuggestions" ]]; then
-  source "${XDG_DATA_HOME}/zsh/zsh-autosuggestions/zsh-autosuggestions.zsh"
+if [[ -d "${SHELL_CONFIG_DIR}/share/zsh-autosuggestions" ]]; then
+  source "${SHELL_CONFIG_DIR}/share/zsh-autosuggestions/zsh-autosuggestions.zsh"
 else
   echo "Warning: zsh-autosuggestions not found"
 fi
 
-if [[ -f "${XDG_DATA_HOME}/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
-  . "${XDG_DATA_HOME}/zsh/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+if [[ -f "${SHELL_CONFIG_DIR}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
+  . "${SHELL_CONFIG_DIR}/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
 else
   echo "Warning: zsh-syntax-highlighting not found"
 fi
 
 if [[ -z "${INSIDE_EMACS}" ]]; then
-  if [[ -f "${XDG_DATA_HOME}/zsh/zsh-vim-mode/zsh-vim-mode.plugin.zsh" ]]; then
-    . "${XDG_DATA_HOME}/zsh/zsh-vim-mode/zsh-vim-mode.plugin.zsh"
+  if [[ -f "${SHELL_CONFIG_DIR}/share/zsh-vim-mode/zsh-vim-mode.plugin.zsh" ]]; then
+    . "${SHELL_CONFIG_DIR}/share/zsh-vim-mode/zsh-vim-mode.plugin.zsh"
   else
     echo "Warning: zsh-vim-mode not found"
   fi
@@ -451,9 +455,9 @@ export ZSH_AUTOSUGGEST_HIGHLIGHT_STYLE='fg=#5c6370'
 compdef g=git               # Complete 'g' as git
 setopt complete_aliases     # Complete aliased commands
 
-if [[ -d "${XDG_DATA_HOME}/fzf/shell" ]]; then
-  . "${XDG_DATA_HOME}/fzf/shell/completion.zsh"
-  . "${XDG_DATA_HOME}/fzf/shell/key-bindings.zsh"
+if [[ -d "${SHELL_CONFIG_DIR}/share/fzf/shell" ]]; then
+  . "${SHELL_CONFIG_DIR}/share/fzf/shell/completion.zsh"
+  . "${SHELL_CONFIG_DIR}/share/fzf/shell/key-bindings.zsh"
 else
   echo "Warning: fzf shell completions and keybindings not found"
 fi

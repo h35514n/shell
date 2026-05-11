@@ -28,6 +28,22 @@ Requirements
 Fresh Setup
 -----------
 
+Zsh plugins (`zsh-autosuggestions`, `zsh-syntax-highlighting`,
+`zsh-vim-mode`), `fzf` shell integration, the `pd` directory helper, and the
+tmux plugins (`tpm`, `tmux-open`, `tmux-prefix-highlight`, `tmux-urlview`)
+are vendored under `share/` as git submodules. Clone the repo with
+submodules so `share/` is populated:
+
+``` sh
+git clone --recurse-submodules <url>
+# or, on an existing checkout:
+git submodule update --init --recursive
+```
+
+If this repo is itself a submodule of a parent dotfiles repo, clone the
+parent with `--recurse-submodules` so nested submodules come down in one
+pass.
+
 On a remote Linux VM, run the setup script from this directory:
 
 ``` sh
@@ -143,6 +159,12 @@ Tmux helpers (live in `tmux/`, on `$PATH` via the shims):
 Notes
 -----
 
+- Vendored plugin/runtime dependencies live under `share/` as git
+  submodules: `zsh-autosuggestions`, `zsh-syntax-highlighting`,
+  `zsh-vim-mode`, `fzf`, `pd`, `tpm`, `tmux-open`,
+  `tmux-prefix-highlight`, `tmux-urlview`. `zshrc` sources them from
+  `$SHELL_CONFIG_DIR/share/...` rather than `$XDG_DATA_HOME`, so no XDG
+  data layout is required on the host.
 - The repo's config files are never modified by `script/setup`. All
   host-specific environment setup lives in the shims and in the setup
   script itself.
