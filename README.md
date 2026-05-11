@@ -6,22 +6,29 @@ fzf-driven helper scripts. Designed to drop into a remote Linux box
 (AWS, GCP, GitHub Codespaces) and bring an ergonomic shell environment
 with a small dependency set.
 
-The repo's tracked config files (`zshrc`, `zshenv`, `bashrc`,
-`gitconfig`) are treated as **reference files**. They are never modified
-or symlinked by the setup script. Instead, the setup script writes small
-shim files into `$HOME` that set up the environment and `source` the
-repo's files.
+The repo's tracked config files (`zshrc`, `bashrc`, `env.sh`,
+`gitconfig`, `tmux.conf`) are treated as **reference files** by the
+setup script --- it never modifies or symlinks them. Instead, it writes
+small shim files into `$HOME` that set up the environment and `source`
+the repo's files.
 
 Requirements
 ------------
 
 - Zsh 5.8 or newer recommended; Bash 4 or newer for the Bash config.
 - Required CLI tools: `git`, `curl`, `tmux`, `fzf`, `ripgrep`, `bat`,
-  `eza` (installed by `script/setup` via the package manager on
-  Debian 13+ / Ubuntu 24.04+ / Fedora 38+, or as a prebuilt binary on
+  `trash` (from `trash-cli` --- the `rm` alias in `env.sh` wraps it),
+  `xclip` (used by the cross-platform `pbcopy`/`pbpaste` shims in
+  `utils/`), `eza` (installed by `script/setup` via the package manager
+  on Debian 13+ / Ubuntu 24.04+ / Fedora 38+, or as a prebuilt binary on
   older distros).
 - Recommended local tools:
   - Diffs: `git-delta`
+  - Go (>= 1.24) to build `share/pd`, the directory-jump helper used
+    by the `cd()` override in `zshrc`. See *Notes* below.
+  - Ruby for `pp` (`pretty-print-path`) and the tmux `bind-key N`
+    rename helper, which uses `random-phrase`. Install
+    `spicy-proton` (`gem install spicy-proton`) for `random-phrase`.
   - Linting/formatting: `shellcheck`, `shfmt`, `jq`, `yamllint`
   - Tags: `universal-ctags`
 
@@ -60,12 +67,15 @@ The script supports Debian/Ubuntu via `apt-get` and Red
 Hat/Amazon/Fedora style hosts via `yum` or `dnf`. It installs the base
 CLI dependencies and writes shim files into `$HOME`:
 
-- `~/.zshenv`, `~/.bashrc` --- export `SHELL_CONFIG_DIR`,
-  `DOTFILES_DIR`, prepend `${SHELL_CONFIG_DIR}/git` and
-  `${SHELL_CONFIG_DIR}/tmux` to `PATH` (idempotently), and then
-  `source` the repo's reference file (when present).
+- `~/.zshenv` --- exports `SHELL_CONFIG_DIR`, `DOTFILES_DIR`,
+  `MACHINE` (defaults to `linux`, leaves any pre-existing value
+  alone), and prepends `${SHELL_CONFIG_DIR}/{git,tmux,utils}` to `PATH`
+  (idempotently). No repo `zshenv` is shipped, so this shim is
+  self-contained.
 - `~/.zshrc` --- sources the repo's `zshrc` (env already set by
   `.zshenv`).
+- `~/.bashrc` --- exports the same vars as `.zshenv` and then `source`s
+  the repo's `bashrc`.
 - `~/.tmux.conf` --- runs `set-environment -g SHELL_CONFIG_DIR ...`
   and `source-file` the repo's `tmux.conf`. tmux expands
   `${SHELL_CONFIG_DIR}` when loading plugins from `share/`.
@@ -82,28 +92,27 @@ up backups.
 If the repo lives outside `$HOME/.dotfiles` and the parent dotfiles tree
 isn't present, `script/setup` also writes an empty stub at
 `${DOTFILES_DIR}/env/setup.sh` (default `$HOME/.dotfiles/env/setup.sh`)
-so that the unconditional `source` line in `zshenv`/`bashrc` doesn't
-error. Override with `--dotfiles-dir DIR` if your parent dotfiles live
-elsewhere.
+so that `bashrc`'s unconditional `source` line doesn't error. Override
+with `--dotfiles-dir DIR` if your parent dotfiles live elsewhere.
 
 Manual Setup
 ------------
 
 Install the base packages with your package manager
-(`bash zsh tmux git curl fzf ripgrep bat eza`), then create the shims
-yourself, replacing `/abs/path/to/shell` with the absolute path to this
-checkout.
+(`bash zsh tmux git curl fzf ripgrep bat eza trash-cli xclip`), then
+create the shims yourself, replacing `/abs/path/to/shell` with the
+absolute path to this checkout.
 
 `~/.zshenv`:
 
 ``` sh
 export SHELL_CONFIG_DIR="/abs/path/to/shell"
 export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
+export MACHINE="${MACHINE:-linux}"
 case ":$PATH:" in
   *":$SHELL_CONFIG_DIR/git:"*) ;;
-  *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$PATH" ;;
+  *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$SHELL_CONFIG_DIR/utils:$PATH" ;;
 esac
-[ -r "$SHELL_CONFIG_DIR/zshenv" ] && . "$SHELL_CONFIG_DIR/zshenv"
 ```
 
 `~/.zshrc`:
@@ -117,9 +126,10 @@ esac
 ``` sh
 export SHELL_CONFIG_DIR="/abs/path/to/shell"
 export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
+export MACHINE="${MACHINE:-linux}"
 case ":$PATH:" in
   *":$SHELL_CONFIG_DIR/git:"*) ;;
-  *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$PATH" ;;
+  *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$SHELL_CONFIG_DIR/utils:$PATH" ;;
 esac
 [ -r "$SHELL_CONFIG_DIR/bashrc" ] && . "$SHELL_CONFIG_DIR/bashrc"
 ```
@@ -157,6 +167,16 @@ Git helpers (live in `git/`, exposed via the gitconfig aliases):
 - `git rmc`: remove a commit by sha
 - `git bdo`: prune local branches whose remotes are gone
 
+Util helpers (live in `utils/`, on `$PATH` via the shims):
+
+- `pbcopy` / `pbpaste`: cross-platform clipboard shims. Branch on
+  `$MACHINE` --- `linux` calls `xclip`, `apple`/`intel-mac` call the
+  macOS builtins. The shim exports `MACHINE=linux` on remote hosts.
+- `pretty-print-path` (alias: `pp`): print `$PATH` / `$MANPATH` /
+  `$CDPATH` one entry per line. Needs Ruby.
+- `random-phrase`: emit a random two-word phrase (used by the tmux
+  `bind-key N` rename binding). Needs Ruby + the `spicy-proton` gem.
+
 Tmux helpers (live in `tmux/`, on `$PATH` via the shims):
 
 - `mx`: tmux + tmuxinator wrapper for managing sessions and templates
@@ -165,11 +185,12 @@ Tmux helpers (live in `tmux/`, on `$PATH` via the shims):
 - `mx-fzf-preview`: fzf preview helper used by `mx`
 
 The `tmux.conf` shipped with this repo rebinds the prefix to `Ctrl-a`
-(default is `Ctrl-b`) and uses tpm + the vendored plugins under
-`share/` --- on first launch hit `prefix + I` so tpm wires the plugins
-in (`tmux-prefix-highlight`, `tmux-copycat`, etc.) from the manifest.
-`bind-key N` calls an external `random-phrase` command to rename the
-session; install it separately or rebind to taste.
+(default is `Ctrl-b`) and loads tpm + the vendored plugins under
+`share/` (`tmux-open`, `tmux-prefix-highlight`, `tmux-urlview`). The
+plugins are run-shell'd directly, so no `prefix + I` bootstrap is
+needed unless you add a new entry to `@tpm_plugins`. `bind-key N`
+calls an external `random-phrase` command to rename the session;
+install it separately or rebind to taste.
 
 Notes
 -----
@@ -189,9 +210,22 @@ Notes
   manually (https://github.com/dandavison/delta/releases). Without it,
   the gitconfig's `pager.diff = delta` falls back to git's built-in
   pager.
+- `share/pd` is a small Go program (the `pd` directory-jump helper used
+  by the `cd()` override in `zshrc`). It's not built by `script/setup`
+  because it pulls in Go and a handful of Go modules. To build it:
+
+    ``` sh
+    cd "$SHELL_CONFIG_DIR/share/pd"
+    go build -o "$HOME/.local/bin/pd"
+    ```
+
+  Requires Go >= 1.24 (`share/pd/go.mod` pins `go 1.24.2`, toolchain
+  `go1.24.5`). Without `pd` on `$PATH`, `zshrc`'s `cd()` falls back to
+  the builtin --- everything still works, you just lose the fuzzy
+  directory matching.
 - This repo is intended to be added as a submodule under a parent
   dotfiles repo. When it stands alone, `script/setup` creates an empty
-  stub at `${DOTFILES_DIR}/env/setup.sh` so the configs' unconditional
+  stub at `${DOTFILES_DIR}/env/setup.sh` so `bashrc`'s unconditional
   source line doesn't error.
 - The setup script does not run `chsh`. If you want zsh as your login
   shell on the remote box, run `chsh -s "$(command -v zsh)"` yourself.
