@@ -16,7 +16,10 @@ Requirements
 ------------
 
 - Zsh 5.8 or newer recommended; Bash 4 or newer for the Bash config.
-- Required CLI tools: `git`, `curl`, `tmux`, `fzf`, `ripgrep`, `bat`.
+- Required CLI tools: `git`, `curl`, `tmux`, `fzf`, `ripgrep`, `bat`,
+  `eza` (installed by `script/setup` via the package manager on
+  Debian 13+ / Ubuntu 24.04+ / Fedora 38+, or as a prebuilt binary on
+  older distros).
 - Recommended local tools:
   - Diffs: `git-delta`
   - Linting/formatting: `shellcheck`, `shfmt`, `jq`, `yamllint`

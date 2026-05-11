@@ -228,6 +228,85 @@ install_language_tools() {
   install_ruby_deps
 }
 
+pkg_provides_eza() {
+  case "${PACKAGE_MANAGER}" in
+    apt)
+      apt-cache show eza >/dev/null 2>&1
+      ;;
+    dnf|yum)
+      "${PACKAGE_MANAGER}" info eza >/dev/null 2>&1
+      ;;
+  esac
+}
+
+install_eza_binary() {
+  local arch url install_dir tmpdir
+  case "$(uname -m)" in
+    x86_64)
+      arch="x86_64-unknown-linux-gnu"
+      ;;
+    aarch64|arm64)
+      arch="aarch64-unknown-linux-gnu"
+      ;;
+    *)
+      warn "unsupported arch for eza prebuilt binary: $(uname -m); install manually"
+      return
+      ;;
+  esac
+
+  url="https://github.com/eza-community/eza/releases/latest/download/eza_${arch}.tar.gz"
+
+  if [ "$(id -u)" -eq 0 ] || [ -w /usr/local/bin ]; then
+    install_dir=/usr/local/bin
+  else
+    install_dir="${HOME}/.local/bin"
+    run mkdir -p "${install_dir}"
+  fi
+
+  if [ "${DRY_RUN}" = "1" ]; then
+    printf '+ curl -fL %q -o eza.tar.gz && install eza -> %q\n' "${url}" "${install_dir}/eza"
+    return
+  fi
+
+  tmpdir="$(mktemp -d)"
+  if ! curl -fL --output "${tmpdir}/eza.tar.gz" "${url}"; then
+    warn "failed to download eza from ${url}; install manually"
+    rm -rf "${tmpdir}"
+    return
+  fi
+
+  if ! tar -xzf "${tmpdir}/eza.tar.gz" -C "${tmpdir}"; then
+    warn "failed to extract eza tarball; install manually"
+    rm -rf "${tmpdir}"
+    return
+  fi
+
+  if [ "${install_dir}" = "/usr/local/bin" ]; then
+    as_root install -m 0755 "${tmpdir}/eza" /usr/local/bin/eza
+  else
+    install -m 0755 "${tmpdir}/eza" "${install_dir}/eza"
+    log "Installed eza to ${install_dir}/eza (ensure ${install_dir} is on PATH)"
+  fi
+
+  rm -rf "${tmpdir}"
+}
+
+install_eza() {
+  if have eza; then
+    log "eza already installed"
+    return
+  fi
+
+  if pkg_provides_eza; then
+    log "Installing eza via ${PACKAGE_MANAGER}"
+    install_packages "${PACKAGE_MANAGER}" eza
+    return
+  fi
+
+  log "eza not in ${PACKAGE_MANAGER} repos; installing prebuilt binary"
+  install_eza_binary
+}
+
 ensure_dotfiles_stub() {
   local stub="${DOTFILES_DIR_VALUE}/env/setup.sh"
 
@@ -369,6 +448,9 @@ esac
 
 log "Installing OS packages"
 install_packages "${PACKAGE_MANAGER}" "${packages[@]}"
+
+log "Ensuring eza is installed"
+install_eza
 
 if [ "${INSTALL_LANGUAGE_TOOLS}" = "1" ]; then
   log "Installing optional language tools"
