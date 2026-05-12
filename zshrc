@@ -29,7 +29,6 @@
 # 8. Custom Widgets and Behaviors
 #    8.1 History Search
 #    8.2 Ctrl-Z Toggle
-#    8.3 Custom CD with PD
 # 9. Key Bindings
 # 10. Colors and Prompt
 #     10.1 Color Helper
@@ -50,7 +49,9 @@
 
 # 2. Aliases
 # ----------
-# Zsh-only aliases. Portable aliases live in env.sh.
+# Zsh-only aliases. Portable aliases live in env.sh:
+#    2.1 File Management and Navigation
+#    2.2 Safeguards
 
 # 2.3 Postfix (Suffix Aliases)
 # These are global aliases (-g) that can be appended to any command for piping.
@@ -58,9 +59,16 @@ alias -g G='| grep --line-number --context=1'  # Grep with line numbers and 1 li
 alias -g C='| pbcopy'       # Copy output to clipboard
 alias -g P='| less'         # Pipe to pager
 
+# 3. Environment Variables
+# -------------------------
+# (extracted to env.sh)
+
 # 4. Functions
 # ------------
 # Custom functions for common tasks, git status parsing, and prompt building.
+# Extracted:
+#    4.1 Directory Creation and Navigation
+#    4.2 File Creation
 
 # 4.3 Diff Utility
 # Colorized diff using delta.
@@ -324,23 +332,6 @@ ctrlz() {
 }
 zle -N ctrlz
 
-# 8.3 Custom CD with PD
-# Use pd if available for path resolution; fallback to builtin cd.
-cd() {
-  local target
-  if type pd >/dev/null; then
-    target="$(pd "$1")"
-  else
-    target="${@}"
-  fi
-
-  if [[ "${target}" == -* ]] || [[ -d "${target}" ]]; then
-    builtin cd "${target}"
-  else
-    echo "Directory Not Found: ${target//$HOME/~}"
-  fi
-}
-
 # 9. Key Bindings
 # ---------------
 # Define key bindings across modes. Includes FZF integration and history navigation.
@@ -356,8 +347,15 @@ bindkey "^t"    fzf-file-widget  # FZF file finder
 bindkey "^x"    after-first-word # Move to after first word
 bindkey "^z"    ctrlz            # Ctrl-Z toggle
 
-# String-Based (macros)
-bindkey -s "^h" "cd\n"           # CD with PD
+pd-switch() {
+  local dir
+  zle -I               # suspend ZLE input handling
+  dir="$(pd)"
+  [[ -n "$dir" ]] && builtin cd "$dir"
+  zle reset-prompt
+}
+zle -N pd-switch
+bindkey '^h' pd-switch
 
 # Emacs Mode
 bindkey -M emacs '^y' accept-and-hold
