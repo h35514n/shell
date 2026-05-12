@@ -183,7 +183,6 @@ setopt pushd_to_home cdable_vars pushd_ignore_dups  # Push ~ on empty, vars as d
 export DIRSTACKSIZE=10      # Limit directory stack size
 
 # 5.3 History Settings
-export HISTFILE="${XDG_STATE_HOME}/zsh/history"  # History file location (XDG compliant)
 export HISTORY_IGNORE="(ls|cd|pwd|exit|cd|h|l|lla|lld|g|g d|g co)"  # Ignore common commands
 export HISTSIZE=50000       # In-memory history size
 export SAVEHIST=50000       # Saved history size
