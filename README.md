@@ -16,12 +16,13 @@ Requirements
 ------------
 
 - Zsh 5.8 or newer recommended; Bash 4 or newer for the Bash config.
-- Required CLI tools: `git`, `curl`, `tmux`, `fzf`, `ripgrep`, `bat`,
+- Required CLI tools: `git`, `curl`, `tmux`, `ripgrep`, `bat`,
   `trash` (from `trash-cli` --- the `rm` alias in `env.sh` wraps it),
   `xclip` (used by the cross-platform `pbcopy`/`pbpaste` shims in
   `utils/`), `eza` (installed by `script/setup` via the package manager
   on Debian 13+ / Ubuntu 24.04+ / Fedora 38+, or as a prebuilt binary on
-  older distros).
+  older distros), `fzf` (installed by `script/setup` from the vendored
+  `share/fzf` submodule via its `install --bin` script).
 - Recommended local tools:
   - Diffs: `git-delta`
   - Go (>= 1.24) to build `share/pd`, the directory-jump helper used
@@ -69,9 +70,9 @@ CLI dependencies and writes shim files into `$HOME`:
 
 - `~/.zshenv` --- exports `SHELL_CONFIG_DIR`, `DOTFILES_DIR`,
   `MACHINE` (defaults to `linux`, leaves any pre-existing value
-  alone), and prepends `${SHELL_CONFIG_DIR}/{git,tmux,utils}` to `PATH`
-  (idempotently). No repo `zshenv` is shipped, so this shim is
-  self-contained.
+  alone), and prepends `${SHELL_CONFIG_DIR}/{git,tmux,utils,share/fzf/bin}`
+  to `PATH` (idempotently). No repo `zshenv` is shipped, so this shim
+  is self-contained.
 - `~/.zshrc` --- sources the repo's `zshrc` (env already set by
   `.zshenv`).
 - `~/.bashrc` --- exports the same vars as `.zshenv` and then `source`s
@@ -99,9 +100,16 @@ Manual Setup
 ------------
 
 Install the base packages with your package manager
-(`bash zsh tmux git curl fzf ripgrep bat eza trash-cli xclip`), then
-create the shims yourself, replacing `/abs/path/to/shell` with the
-absolute path to this checkout.
+(`bash zsh tmux git curl ripgrep bat trash-cli xclip`), install `eza`
+either via the package manager (Debian 13+ / Ubuntu 24.04+ / Fedora
+38+) or as a prebuilt binary, and install `fzf` from the submodule:
+
+``` sh
+share/fzf/install --bin
+```
+
+Then create the shims yourself, replacing `/abs/path/to/shell` with
+the absolute path to this checkout.
 
 `~/.zshenv`:
 
@@ -111,7 +119,7 @@ export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
 export MACHINE="${MACHINE:-linux}"
 case ":$PATH:" in
   *":$SHELL_CONFIG_DIR/git:"*) ;;
-  *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$SHELL_CONFIG_DIR/utils:$PATH" ;;
+  *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$SHELL_CONFIG_DIR/utils:$SHELL_CONFIG_DIR/share/fzf/bin:$PATH" ;;
 esac
 ```
 
@@ -129,7 +137,7 @@ export DOTFILES_DIR="${DOTFILES_DIR:-$HOME/.dotfiles}"
 export MACHINE="${MACHINE:-linux}"
 case ":$PATH:" in
   *":$SHELL_CONFIG_DIR/git:"*) ;;
-  *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$SHELL_CONFIG_DIR/utils:$PATH" ;;
+  *) export PATH="$SHELL_CONFIG_DIR/git:$SHELL_CONFIG_DIR/tmux:$SHELL_CONFIG_DIR/utils:$SHELL_CONFIG_DIR/share/fzf/bin:$PATH" ;;
 esac
 [ -r "$SHELL_CONFIG_DIR/bashrc" ] && . "$SHELL_CONFIG_DIR/bashrc"
 ```

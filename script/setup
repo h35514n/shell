@@ -16,7 +16,8 @@ tmux/) and source the repo's reference files.
 
 Options:
   --minimal               Install only the base deps (zsh, bash, tmux, git,
-                          curl, fzf, ripgrep, bat, eza, trash-cli, xclip).
+                          curl, ripgrep, bat, eza, trash-cli, xclip, plus
+                          fzf via the vendored share/fzf submodule).
   --with-language-tools   Install optional linters/formatters and Python deps
                           for git-commit-generator.
   --dotfiles-dir DIR      Set DOTFILES_DIR in the generated shims. Defaults to
@@ -309,6 +310,27 @@ install_eza() {
   install_eza_binary
 }
 
+install_fzf() {
+  local fzf_bin="${SHELL_CONFIG_DIR}/share/fzf/bin/fzf"
+  local installer="${SHELL_CONFIG_DIR}/share/fzf/install"
+
+  if [ -x "${fzf_bin}" ]; then
+    log "fzf binary already present at ${fzf_bin}"
+    return
+  fi
+
+  if [ ! -x "${installer}" ]; then
+    warn "fzf submodule installer not found at ${installer}"
+    warn "did you clone with --recurse-submodules?"
+    return
+  fi
+
+  log "Running vendored fzf installer (--bin)"
+  # --bin downloads only the binary; we source completion/key-bindings
+  # directly from share/fzf/shell/ via zshrc, so no rc edits are needed.
+  run "${installer}" --bin
+}
+
 ensure_dotfiles_stub() {
   local stub="${DOTFILES_DIR_VALUE}/env/setup.sh"
 
@@ -378,7 +400,7 @@ export DOTFILES_DIR=\"\${DOTFILES_DIR:-${DOTFILES_DIR_VALUE}}\"
 export MACHINE=\"\${MACHINE:-linux}\"
 case \":\$PATH:\" in
   *\":\$SHELL_CONFIG_DIR/git:\"*) ;;
-  *) export PATH=\"\$SHELL_CONFIG_DIR/git:\$SHELL_CONFIG_DIR/tmux:\$SHELL_CONFIG_DIR/utils:\$PATH\" ;;
+  *) export PATH=\"\$SHELL_CONFIG_DIR/git:\$SHELL_CONFIG_DIR/tmux:\$SHELL_CONFIG_DIR/utils:\$SHELL_CONFIG_DIR/share/fzf/bin:\$PATH\" ;;
 esac
 "
 }
@@ -404,7 +426,7 @@ export DOTFILES_DIR=\"\${DOTFILES_DIR:-${DOTFILES_DIR_VALUE}}\"
 export MACHINE=\"\${MACHINE:-linux}\"
 case \":\$PATH:\" in
   *\":\$SHELL_CONFIG_DIR/git:\"*) ;;
-  *) export PATH=\"\$SHELL_CONFIG_DIR/git:\$SHELL_CONFIG_DIR/tmux:\$SHELL_CONFIG_DIR/utils:\$PATH\" ;;
+  *) export PATH=\"\$SHELL_CONFIG_DIR/git:\$SHELL_CONFIG_DIR/tmux:\$SHELL_CONFIG_DIR/utils:\$SHELL_CONFIG_DIR/share/fzf/bin:\$PATH\" ;;
 esac
 [ -r \"\$SHELL_CONFIG_DIR/bashrc\" ] && . \"\$SHELL_CONFIG_DIR/bashrc\"
 "
@@ -465,6 +487,9 @@ install_packages "${PACKAGE_MANAGER}" "${packages[@]}"
 
 log "Ensuring eza is installed"
 install_eza
+
+log "Ensuring fzf is installed from vendored submodule"
+install_fzf
 
 if [ "${INSTALL_LANGUAGE_TOOLS}" = "1" ]; then
   log "Installing optional language tools"
