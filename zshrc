@@ -129,7 +129,7 @@ git_branch() {
   fi
 }
 
-gitstatus_prompt() {
+gitstatus_prompt_update() {
   PROMPT=${SSH_CONNECTION:+$(color gray)%n@%m$(color reset)$'\n'}
   if [[ -z "${VIRTUAL_ENV}" ]]; then
     PROMPT+="$(color blue)%c$(color reset) "
@@ -137,33 +137,36 @@ gitstatus_prompt() {
     PROMPT+="$(color orange)%c$(color reset) "
   fi
 
-  if gitstatus_query MY && [[ ${VCS_STATUS_RESULT} == ok-sync ]]; then
-    if (( VCS_STATUS_HAS_CONFLICTED ));
-    then
+  if [[ ${VCS_STATUS_RESULT} == ok-sync || ${VCS_STATUS_RESULT} == ok-async ]]; then
+    if (( VCS_STATUS_HAS_CONFLICTED )); then
       PROMPT+="$(color violet)"
-    elif (( VCS_STATUS_HAS_STAGED )) ||
-         (( VCS_STATUS_HAS_UNSTAGED ));
-    then
+    elif (( VCS_STATUS_HAS_STAGED )) || (( VCS_STATUS_HAS_UNSTAGED )); then
       PROMPT+="$(color red)"
-    elif (( VCS_STATUS_HAS_UNTRACKED ));
-    then
+    elif (( VCS_STATUS_HAS_UNTRACKED )); then
       PROMPT+="$(color gray)"
-    elif (( VCS_STATUS_COMMITS_AHEAD )) ||
-         (( VCS_STATUS_COMMITS_BEHIND )) ||
-         (( VCS_STATUS_PUSH_COMMITS_AHEAD )) ||
-         (( VCS_STATUS_PUSH_COMMITS_BEHIND ));
-    then
+    elif (( VCS_STATUS_COMMITS_AHEAD )) || (( VCS_STATUS_COMMITS_BEHIND )) ||
+         (( VCS_STATUS_PUSH_COMMITS_AHEAD )) || (( VCS_STATUS_PUSH_COMMITS_BEHIND )); then
       PROMPT+="$(color yellow)"
     else
       PROMPT+="$(color green)"
     fi
     local hash="${VCS_STATUS_COMMIT:0:10}"
     local branch="${VCS_STATUS_LOCAL_BRANCH:-@${hash}}"
-    PROMPT+="${branch//\%/%%} "  # Escape %
+    PROMPT+="${branch//\%/%%} " # Escape %
   fi
 
   PROMPT+="$(color reset)%# "
-  setopt no_prompt_{bang,subst} prompt_percent  # Enable/disable correct prompt expansions
+  setopt no_prompt_{bang,subst} prompt_percent # Enable/disable correct prompt expansions
+}
+
+gitstatus_prompt() {
+  gitstatus_query -t 0 -c gitstatus_prompt_redraw MY
+  gitstatus_prompt_update
+}
+
+gitstatus_prompt_redraw() {
+  gitstatus_prompt_update
+  zle && zle reset-prompt
 }
 
 git_prompt() {
@@ -351,7 +354,10 @@ pd-switch() {
   local dir
   zle -I               # suspend ZLE input handling
   dir="$(pd)"
-  [[ -n "$dir" ]] && builtin cd "$dir"
+  if [[ -n "$dir" ]]; then
+    builtin cd "$dir"
+    gitstatus_prompt
+  fi
   zle reset-prompt
 }
 zle -N pd-switch
