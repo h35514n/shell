@@ -473,8 +473,5 @@ fi
 # -----------------------------------
 # Source private or machine-specific configs last.
 
-[[ -f "${XDG_SECURE_DIR}/config/zsh/zshrc" ]] && \
-  . "${XDG_SECURE_DIR}/config/zsh/zshrc"
-
 [[ -f "${XDG_LOCALS_DIR}/config/zsh/zshrc" ]] && \
   . "${XDG_LOCALS_DIR}/config/zsh/zshrc"
