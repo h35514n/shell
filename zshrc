@@ -17,6 +17,7 @@
 #    4.2 File Creation
 #    4.3 Diff Utility
 #    4.4 Git Prompt Helpers
+#    4.5 p/d Helpers
 # 5. Zsh Options and Settings
 #    5.1 General Options
 #    5.2 Directory Stack
@@ -76,6 +77,9 @@ diff() {
   [[ -n "${1}" ]] && [[ -n "${2}" ]] || return
   "${HOMEBREW_PREFIX}/bin/diff" -u "${1}" "${2}" | delta
 }
+
+# Enable Zsh hooks
+autoload -Uz add-zsh-hook
 
 # 4.4 Git Prompt Helpers
 #
@@ -177,6 +181,33 @@ git_prompt() {
   prompt+='$(git_branch)'                    # Git branch/commit with color
   prompt+='$(color reset)%# '                # Reset and prompt symbol
   echo "${prompt}"
+}
+
+# 4.5. p/d helpers
+# ----------------
+_pd_log_cwd() {
+  if [[ -n "${_pd_skip_log_once:-}" ]]; then
+    _pd_skip_log_once=
+    return
+  fi
+  pd --pd-log-cwd >/dev/null 2>&1
+}
+add-zsh-hook chpwd _pd_log_cwd
+
+pd-switch() {
+  local dir
+  local oldpwd="$PWD"
+  zle -I               # suspend ZLE input handling
+  dir="$(pd)"
+  if [[ -n "$dir" ]]; then
+    _pd_skip_log_once=1
+    if builtin cd "$dir"; then
+      [[ "$PWD" == "$oldpwd" ]] && _pd_skip_log_once=
+    else
+      _pd_skip_log_once=
+    fi
+  fi
+  zle reset-prompt
 }
 
 # 5. Zsh Options and Settings
@@ -342,26 +373,15 @@ zle -N ctrlz
 # ZLE Definitions (placeholders; assume fzf-file-widget and prefix-2 are defined elsewhere)
 zle -N fzf-file-widget
 zle -N prefix-2
+zle -N pd-switch
 
 # All Modes
 bindkey "^[[3"  prefix-2         # Delete backwards
 bindkey "^[[3~" delete-char      # Delete forwards
+bindkey "^h"    pd-switch
 bindkey "^t"    fzf-file-widget  # FZF file finder
 bindkey "^x"    after-first-word # Move to after first word
 bindkey "^z"    ctrlz            # Ctrl-Z toggle
-
-pd-switch() {
-  local dir
-  zle -I               # suspend ZLE input handling
-  dir="$(pd)"
-  if [[ -n "$dir" ]]; then
-    builtin cd "$dir"
-    gitstatus_prompt
-  fi
-  zle reset-prompt
-}
-zle -N pd-switch
-bindkey '^h' pd-switch
 
 # Emacs Mode
 bindkey -M emacs '^y' accept-and-hold
@@ -422,7 +442,6 @@ setopt prompt_subst  # Enable substitution in prompt
 if [[ -f "${HOMEBREW_PREFIX}/opt/gitstatus/gitstatus.plugin.zsh" ]]; then
   . "${HOMEBREW_PREFIX}/opt/gitstatus/gitstatus.plugin.zsh"
   gitstatus_stop 'MY' && gitstatus_start -s -1 -u -1 -c -1 -d -1 'MY'
-  autoload -Uz add-zsh-hook
   add-zsh-hook precmd gitstatus_prompt
 else
   export PS1="$(git_prompt)"
