@@ -228,6 +228,7 @@ export DIRSTACKSIZE=10      # Limit directory stack size
 export HISTORY_IGNORE="(ls|cd|pwd|exit|cd|h|l|lla|lld|g|g d|g co)"  # Ignore common commands
 export HISTSIZE=50000       # In-memory history size
 export SAVEHIST=50000       # Saved history size
+export HISTFILE=${XDG_STATE_HOME}/zsh/history
 
 setopt EXTENDED_HISTORY       # Save timestamp and duration
 setopt HIST_EXPIRE_DUPS_FIRST # Expire duplicates first
