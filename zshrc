@@ -203,6 +203,7 @@ pd-switch() {
     _pd_skip_log_once=1
     if builtin cd "$dir"; then
       [[ "$PWD" == "$oldpwd" ]] && _pd_skip_log_once=
+      (( $+functions[gitstatus_prompt] )) && gitstatus_prompt
     else
       _pd_skip_log_once=
     fi
