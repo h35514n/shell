@@ -1,0 +1,238 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+debug=0
+root_repo=""
+msg="sub: Update $(date +%F)"
+
+for arg in "$@"; do
+	case "$arg" in
+	-d | --debug) debug=1 ;;
+	-h | --help)
+		echo "Usage: git-subsync [-d|--debug]"
+		exit 0
+		;;
+	*)
+		echo "Unknown argument: $arg" >&2
+		exit 2
+		;;
+	esac
+done
+
+dbg() { ((debug)) && echo "$@" >&2 || true; }
+log() { printf '%-7s %-45s %s\n' "$1" "$2" "$3"; }
+
+owner_of() {
+	local url="$1" path
+	case "$url" in
+	git@*:*) path="${url#*:}" ;;
+	*://*)
+		path="${url#*://}"
+		path="${path#*/}"
+		;;
+	*) path="$url" ;;
+	esac
+	path="${path%.git}"
+	printf '%s\n' "${path%%/*}"
+}
+
+upstream() {
+	git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null
+}
+
+remote_url() {
+	local u r
+	u="$(upstream)" || return 1
+	r="${u%%/*}"
+	git remote get-url "$r"
+}
+
+repo_owner() {
+	local url
+	url="$(remote_url)" || return 1
+	owner_of "$url"
+}
+
+label() {
+	local here
+	here="$(git rev-parse --show-toplevel)"
+	[[ "$here" == "$root_repo" ]] && printf '.' || realpath --relative-to="$root_repo" "$here"
+}
+
+branch() {
+	git branch --show-current
+}
+
+ahead_behind() {
+	local u
+	u="$(upstream)" || return 1
+	git rev-list --left-right --count "HEAD...$u"
+}
+
+submodules() {
+	git config --file .gitmodules --get-regexp '^submodule\..*\.path$' 2>/dev/null || true
+}
+
+sub_name() {
+	local key="$1"
+	key="${key#submodule.}"
+	printf '%s\n' "${key%.path}"
+}
+
+sub_branch() {
+	git config --file .gitmodules --get "submodule.$1.branch" 2>/dev/null || true
+}
+
+checkout_and_pull_submodule() {
+	local path="$1" name="$2" b cur
+
+	b="$(sub_branch "$name")"
+
+	[[ -z "$b" ]] && {
+		dbg "Skipping pull in $(pwd)/$path: no branch configured"
+		return 0
+	}
+
+	(
+		cd "$path"
+
+		cur="$(branch)"
+		git checkout --quiet "$b"
+		[[ "$cur" != "$b" ]] && log branch "$(label)" "$cur -> $b"
+
+		pull_with_summary
+	)
+}
+
+pull_with_summary() {
+	local u b counts ahead behind before after
+
+	u="$(upstream)" || {
+		dbg "Skipping pull in $(pwd): no upstream"
+		return 0
+	}
+
+	b="$(branch)"
+	git fetch --quiet
+
+	counts="$(ahead_behind)"
+	ahead="${counts%%[[:space:]]*}"
+	behind="${counts##*[[:space:]]}"
+
+	[[ "$ahead" == 0 && "$behind" == 0 ]] && {
+		dbg "Pull noop in $(pwd): up to date"
+		return 0
+	}
+
+	[[ "$behind" == 0 ]] && {
+		dbg "Pull noop in $(pwd): ahead of $u by $ahead"
+		return 0
+	}
+
+	[[ "$ahead" != 0 ]] &&
+		log pull "$(label)" "$b diverged from $u: ahead $ahead, behind $behind; rebasing" ||
+		log pull "$(label)" "$b behind $u by $behind; pulling"
+
+	before="$(git rev-parse HEAD)"
+	git pull --rebase --quiet
+	after="$(git rev-parse HEAD)"
+
+	[[ "$before" != "$after" ]] && log pull "$(label)" "$b updated ${before:0:7} -> ${after:0:7}"
+}
+
+update_submodules() {
+	local key path name
+
+	while read -r key path; do
+		[[ -z "${key:-}" || -z "${path:-}" ]] && continue
+		name="$(sub_name "$key")"
+		checkout_and_pull_submodule "$path" "$name"
+	done < <(submodules)
+}
+
+commit_if_needed() {
+	git add .
+	git diff --cached --quiet && return 0
+
+	git commit -m "$msg" >/dev/null
+	log commit "$(label)" "$msg"
+}
+
+push_if_same_owner() {
+	local root_owner="$1" o u b counts ahead behind
+
+	o="$(repo_owner)" || {
+		dbg "Skipping push in $(pwd): no upstream"
+		return 0
+	}
+
+	[[ "$o" != "$root_owner" ]] && {
+		dbg "Skipping push in $(pwd): owner '$o' != root owner '$root_owner'"
+		return 0
+	}
+
+	u="$(upstream)"
+	b="$(branch)"
+
+	counts="$(ahead_behind)"
+	ahead="${counts%%[[:space:]]*}"
+	behind="${counts##*[[:space:]]}"
+
+	[[ "$ahead" == 0 ]] && {
+		dbg "Push noop in $(pwd): nothing to push"
+		return 0
+	}
+
+	[[ "$behind" != 0 ]] && {
+		log push "$(label)" "$b behind $u by $behind; skipping"
+		return 0
+	}
+
+	git push --quiet
+	log push "$(label)" "$b pushed"
+}
+
+bump_here() {
+	local root_owner="$1" here
+
+	here="$(git rev-parse --show-toplevel)"
+	cd "$here"
+
+	update_submodules
+	commit_if_needed
+	push_if_same_owner "$root_owner"
+}
+
+bump_recursive() {
+	local root_owner="$1" here key path
+
+	here="$(git rev-parse --show-toplevel)"
+	cd "$here"
+
+	while read -r key path; do
+		[[ -z "${key:-}" || -z "${path:-}" ]] && continue
+		(
+			cd "$here/$path"
+			bump_recursive "$root_owner"
+		)
+	done < <(submodules)
+
+	bump_here "$root_owner"
+}
+
+main() {
+	local root_owner
+
+	root_repo="$(git rev-parse --show-toplevel)"
+	cd "$root_repo"
+
+	root_owner="$(repo_owner)" || {
+		echo "Cannot determine root repo upstream remote URL." >&2
+		exit 1
+	}
+
+	bump_recursive "$root_owner"
+}
+
+main
