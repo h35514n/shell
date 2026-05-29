@@ -48,11 +48,15 @@ YELLOW="\e[33m"
 
 TEMPLATE="${BOLDBLK}t${RESET}"
 SESSION="${BLUE}s${RESET}"
+VISOR="${CYAN}v${RESET}"
+
+VISOR_SOCKET="visor"
 
 running_tmux_sessions() {
-    tmux list-sessions 2> /dev/null |\
-        grep -v 'failed to connect' |\
-        sed -E 's/(.+): .+/\1/'
+    local socket="${1:-default}"
+    tmux -L "$socket" list-sessions 2>/dev/null \
+        | grep -v 'failed to connect' \
+        | sed -E 's/(.+): .+/\1/'
 }
 
 tmuxinator_templates() {
@@ -62,25 +66,33 @@ tmuxinator_templates() {
 
 open_or_switch_to_session() {
     name="$(echo "$1" | sed -E 's/\s/\\\ /g')"
+    local socket="${2:-}"
+    local tmux_cmd=("tmux")
+    [[ -n "$socket" ]] && tmux_cmd+=("-L" "$socket")
 
-    if [[ -z "$TMUX" ]]; then
-        echo tmux attach-session -t "$1"
-        tmux attach-session -t "$name"
+    if [[ -z "$TMUX" || -n "$socket" ]]; then
+        echo "${tmux_cmd[@]}" attach-session -t "$1"
+        "${tmux_cmd[@]}" attach-session -t "$name"
     else
-        echo tmux switch-client -t "$1"
-        tmux switch-client -t "$name"
+        echo "${tmux_cmd[@]}" switch-client -t "$1"
+        "${tmux_cmd[@]}" switch-client -t "$name"
     fi
 }
 
 tmux_dwim() {
     sessions="$(running_tmux_sessions)"
+    visor_sessions="$(running_tmux_sessions "$VISOR_SOCKET")"
     templates="$(tmuxinator_templates)"
-    [[ -z "$sessions" ]] && [[ -z "$templates" ]] && exit 0
+    [[ -z "$sessions$visor_sessions$templates" ]] && exit 0
 
     selections_list=""
     IFS=$'\n'
     for session in $sessions; do
       selections_list="$selections_list\n$SESSION $session"
+    done
+
+    for session in $visor_sessions; do
+      selections_list="$selections_list\n$VISOR $session"
     done
 
     for template in $templates; do
@@ -98,6 +110,8 @@ tmux_dwim() {
 
     if [[ "$kind" == 's' ]]; then
         open_or_switch_to_session "$name"
+    elif [[ "$kind" == 'v' ]]; then
+        open_or_switch_to_session "$name" "$VISOR_SOCKET"
     elif [[ "$kind" == 't' ]]; then
         echo tmuxinator start "$name"
         tmuxinator start "$name"
@@ -117,13 +131,18 @@ tmux_attach() {
 
 kill_session_or_template() {
     sessions="$(running_tmux_sessions)"
+    visor_sessions="$(running_tmux_sessions "$VISOR_SOCKET")"
     templates="$(tmuxinator_templates)"
-    [[ -z "$sessions" ]] && [[ -z "$templates" ]] && exit 0
+    [[ -z "$sessions$visor_sessions$templates" ]] && exit 0
 
     selections_list=""
     IFS=$'\n'
     for session in $sessions; do
       selections_list="$selections_list\n$SESSION $session"
+    done
+
+    for session in $visor_sessions; do
+      selections_list="$selections_list\n$VISOR $session"
     done
 
     for template in $templates; do
@@ -154,6 +173,10 @@ kill_session_or_template() {
             fi
 
             printf "done.\n"
+        elif [[ "$kind" == 'v' ]]; then
+            printf "[tmux -L %s kill-session -t %s] ... " "$VISOR_SOCKET" "$name"
+            tmux -L "$VISOR_SOCKET" kill-session -t "$name"
+            printf "done.\n"
         elif [[ "$kind" == 't' ]]; then
             tmuxinator delete "$name"
         else
@@ -164,11 +187,18 @@ kill_session_or_template() {
 }
 
 tmux_status() {
-    # list all running session and available tmuxinator templates
     sessions="$(running_tmux_sessions)"
+    visor_sessions="$(running_tmux_sessions "$VISOR_SOCKET")"
     templates="$(tmuxinator_templates)"
 
-    [[ -z "$sessions" ]] && [[ -z "$templates" ]] && exit 0
+    [[ -z "$sessions$visor_sessions$templates" ]] && exit 0
+
+    if [ -n "$visor_sessions" ]; then
+        echo "Visor Sessions"
+        echo "--------------"
+        echo "$visor_sessions"
+        echo
+    fi
 
     if [ -n "$sessions" ]; then
         echo "Running Sessions"

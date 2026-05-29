@@ -20,11 +20,19 @@ vertical_line() {
 }
 
 if [[ "$type" == "s" ]]; then
-    tmux list-windows \
+    tmux -L default list-windows \
          -t "$name" \
          -F "#{window_index}: #{window_name} (#{window_panes} panes)"
     vertical_line
-    tmux capture-pane -p -e -S0 -E- -J -t "$name"
+    tmux -L default capture-pane -p -e -S0 -E- -J -t "$name"
+fi
+
+if [[ "$type" == "v" ]]; then
+    tmux -L visor list-windows \
+         -t "$name" \
+         -F "#{window_index}: #{window_name} (#{window_panes} panes)"
+    vertical_line
+    tmux -L visor capture-pane -p -e -S0 -E- -J -t "$name"
 fi
 
 if [[ "$type" == "t" ]]; then

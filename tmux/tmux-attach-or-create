@@ -27,7 +27,7 @@ not_in_tmux() {
 }
 
 session_exists() {
-  tmux list-sessions |\
+  tmux -L default list-sessions |\
     sed -E 's/:.*$//' |\
     grep -q "^$session_name$"
 }
