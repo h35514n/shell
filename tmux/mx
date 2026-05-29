@@ -66,13 +66,17 @@ tmuxinator_templates() {
 
 open_or_switch_to_session() {
     name="$(echo "$1" | sed -E 's/\s/\\\ /g')"
-    local socket="${2:-}"
-    local tmux_cmd=("tmux")
-    [[ -n "$socket" ]] && tmux_cmd+=("-L" "$socket")
+    local socket="${2:-default}"
+    local tmux_cmd=("tmux" "-L" "$socket")
+    local current_socket=""
+    [[ -n "$TMUX" ]] && current_socket="$(basename "$(echo "$TMUX" | cut -d, -f1)")"
 
-    if [[ -z "$TMUX" || -n "$socket" ]]; then
+    if [[ -z "$TMUX" ]]; then
         echo "${tmux_cmd[@]}" attach-session -t "$1"
         "${tmux_cmd[@]}" attach-session -t "$name"
+    elif [[ "$socket" != "$current_socket" ]]; then
+        echo tmux detach-client -E "${tmux_cmd[*]} attach-session -t $1"
+        tmux detach-client -E "${tmux_cmd[*]} attach-session -t $name"
     else
         echo "${tmux_cmd[@]}" switch-client -t "$1"
         "${tmux_cmd[@]}" switch-client -t "$name"
