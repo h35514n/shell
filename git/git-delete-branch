@@ -4,9 +4,11 @@
 #
 # Usage: git delete-branch [rem]
 
-FZF="fzf --ansi --layout=reverse --multi"
+FZF="fzf --ansi --layout=reverse --multi \
+  --preview='printf \"[%s]\n\n\" {+1} && git log --format=extended --color=always {+1}' \
+  --preview-window=right,80%"
 
-branches="$(git branch | cut -c 3- | $FZF)"
+branches="$(git branch | cut -c 3- | eval "$FZF")"
 test -z "$branches" && exit 0
 
 for branch in $branches; do
