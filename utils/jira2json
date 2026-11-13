@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Parse a Jira "Word" export (.doc) into JSON on STDOUT."""
+import argparse
+import html
+import json
+import re
+import sys
+from pathlib import Path
+
+FIELDS = [
+    "Status", "Type", "Priority", "Project", "Component/s", "Labels",
+    "Team(s)", "Assignee", "Reporter", "Resolution", "Fix Version/s",
+    "Start Date",
+]
+
+
+def text(fragment):
+    fragment = re.sub(r"<[^>]+>", "", fragment)
+    return re.sub(r"\s+", " ", html.unescape(fragment).replace("\xa0", " ")).strip()
+
+
+def metadata(doc):
+    """Map label -> value from the <b>Label:</b> / value cell pairs."""
+    pairs = re.findall(
+        r"<b>([^<]+?):</b>\s*</td>\s*<td[^>]*>(.*?)</td>", doc, re.S)
+    return {label.strip(): text(value) for label, value in pairs}
+
+
+def description_html(doc):
+    m = re.search(r'<td id="descriptionArea">(.*?)</td>\s*</tr>\s*</table>',
+                  doc, re.S)
+    if not m:
+        sys.exit("No description area found; is this a Jira export?")
+    body = m.group(1)
+    body = re.sub(r'<a name="[^"]*"></a>', "", body)
+    body = re.sub(r'<a [^>]*?(href="[^"]*")[^>]*>', r"<a \1>", body)
+    body = re.sub(r"<br\s*/?>", "", body)
+    body = body.replace("<tt>", "<code>").replace("</tt>", "</code>")
+    return body
+
+
+def parse(doc):
+    """Return ticket parts: key, title, url, created, updated, fields, body."""
+    title_m = re.search(r"<title>\[#?([^\]]+)\]\s*(.*?)</title>", doc, re.S)
+    if not title_m:
+        sys.exit("No title found; is this a Jira export?")
+    url_m = re.search(r'href="(https://[^"]*/browse/[^"]+)"', doc)
+    dates = re.search(r"Created:\s*(\S+)\s*(?:&nbsp;)?\s*Updated:\s*(\S+)", doc)
+    meta = metadata(doc)
+    rows = []
+    if dates:
+        rows += [("Created", dates.group(1)), ("Updated", dates.group(2))]
+    rows += [(f, meta[f]) for f in FIELDS
+             if meta.get(f) and meta[f] not in ("None", "Not Specified")]
+    return {
+        "key": title_m.group(1),
+        "title": html.unescape(title_m.group(2)).strip(),
+        "url": url_m.group(1) if url_m else None,
+        "rows": rows,
+        "body": description_html(doc),
+    }
+
+
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("input", type=Path, help="Jira export (.doc)")
+    args = ap.parse_args()
+    ticket = parse(args.input.read_text(encoding="utf-8", errors="replace"))
+    json.dump(ticket, sys.stdout, indent=2)
+    print()
+
+
+if __name__ == "__main__":
+    main()
