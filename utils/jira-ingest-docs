@@ -4,6 +4,20 @@
 set -euo pipefail
 shopt -s nullglob
 
+usage() {
+  echo "Usage: ${0##*/} [md] [org] [jira]   (default: md)" >&2
+  exit 1
+}
+
+formats=("$@")
+[[ ${#formats[@]} -eq 0 ]] && formats=(md)
+for f in "${formats[@]}"; do
+  case "$f" in
+    md|org|jira) ;;
+    *) echo "Unknown format: $f" >&2; usage ;;
+  esac
+done
+
 SRC_DIR="$HOME/Downloads"
 DEST_DIR="/Users/jromer/Knowledge/work/tickets"
 
@@ -23,19 +37,19 @@ done
 # Step 2: convert each .doc, then trash it once all outputs exist
 for doc in "$DEST_DIR"/*.doc; do
   base="${doc%.doc}"
-  for pair in "md:jiradoc2md" "org:jiradoc2org" "jira:jiradoc2jira"; do
-    ext="${pair%%:*}"
-    cmd="${pair##*:}"
+  all_present=true
+  for ext in "${formats[@]}"; do
     out="$base.$ext"
     if [[ -e "$out" ]]; then
       echo "Already exists, skipping: $out"
       continue
     fi
-    "$cmd" -f "$doc"
+    "jiradoc2$ext" -f "$doc"
     echo "Created: $out"
+    [[ -e "$out" ]] || all_present=false
   done
 
-  if [[ -e "$base.md" && -e "$base.org" && -e "$base.jira" ]]; then
+  if $all_present; then
     trash "$doc"
     echo "Trashed: $doc"
   else
