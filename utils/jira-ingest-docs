@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# Move Jira .doc exports from ~/Downloads into the tickets directory, convert
+# each to .md, .org, and .jira, then trash the .doc. Never overwrite files.
+set -euo pipefail
+shopt -s nullglob
+
+SRC_DIR="$HOME/Downloads"
+DEST_DIR="/Users/jromer/Knowledge/work/tickets"
+
+mkdir -p "$DEST_DIR"
+
+# Step 1: move .doc files
+for doc in "$SRC_DIR"/*.doc; do
+  target="$DEST_DIR/$(basename "$doc")"
+  if [[ -e "$target" ]]; then
+    echo "Already exists, skipping move: $target"
+    continue
+  fi
+  mv -n "$doc" "$target"
+  echo "Moved: $doc -> $target"
+done
+
+# Step 2: convert each .doc, then trash it once all outputs exist
+for doc in "$DEST_DIR"/*.doc; do
+  base="${doc%.doc}"
+  for pair in "md:jiradoc2md" "org:jiradoc2org" "jira:jiradoc2jira"; do
+    ext="${pair%%:*}"
+    cmd="${pair##*:}"
+    out="$base.$ext"
+    if [[ -e "$out" ]]; then
+      echo "Already exists, skipping: $out"
+      continue
+    fi
+    "$cmd" -f "$doc"
+    echo "Created: $out"
+  done
+
+  if [[ -e "$base.md" && -e "$base.org" && -e "$base.jira" ]]; then
+    trash "$doc"
+    echo "Trashed: $doc"
+  else
+    echo "Keeping $doc: not all outputs exist"
+  fi
+done
