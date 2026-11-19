@@ -18,6 +18,7 @@ files="$(
   git status --porcelain            |
     grep -E '^.[MDT\?]'             |
     sed -E 's/.{2}\s\"?(.+)\"?/\1/' |
+    sed -E 's/^.* -> //'            |
     tr -d '"'                       |
     sed -E 's/[\s[]]/\\ /g'
 )"
