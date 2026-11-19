@@ -47,7 +47,12 @@ def cli(description, convert, suffix):
 def description(body):
     out = pandoc(body, "org", "--wrap=auto", "--columns=72")
     out = re.sub(r"^:PROPERTIES:\n:CUSTOM_ID: .*\n:END:\n", "", out, flags=re.M)
-    out = re.sub(r"^(\*+) ", lambda m: "**" + m.group(1) + " ", out, flags=re.M)
+    # Nest headings under the "**" ticket line; shallowest becomes "***".
+    levels = [len(m) for m in re.findall(r"^(\*+) ", out, flags=re.M)]
+    if levels:
+        shift = 2 - min(levels) + 1
+        out = re.sub(r"^(\*+) ", lambda m: "*" * (len(m.group(1)) + shift) + " ",
+                     out, flags=re.M)
     return re.sub(r"\n{3,}", "\n\n", out).strip()
 
 
