@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Move Jira .doc exports from ~/Downloads into the tickets directory, convert
 # each to .md, .org, and .jira, then trash the .doc. Never overwrite files.
+# Only files that were in ~/Downloads at start are processed. When there is
+# only one, its org output goes to the clipboard instead of a file.
 set -euo pipefail
 shopt -s nullglob
 
@@ -24,7 +26,8 @@ DEST_DIR="/Users/jromer/Knowledge/work/tickets"
 mkdir -p "$DEST_DIR"
 
 # Step 1: move .doc files
-for doc in "$SRC_DIR"/*.doc; do
+incoming=("$SRC_DIR"/*.doc)
+for doc in "${incoming[@]}"; do
   target="$DEST_DIR/$(basename "$doc")"
   if [[ -e "$target" ]]; then
     echo "Already exists, skipping move: $target"
@@ -34,12 +37,23 @@ for doc in "$SRC_DIR"/*.doc; do
   echo "Moved: $doc -> $target"
 done
 
-# Step 2: convert each .doc, then trash it once all outputs exist
-for doc in "$DEST_DIR"/*.doc; do
+# Step 2: convert each incoming .doc, then trash it once all outputs exist
+for src in "${incoming[@]}"; do
+  doc="$DEST_DIR/$(basename "$src")"
+  [[ -e "$doc" ]] || continue
   base="${doc%.doc}"
   all_present=true
   for ext in "${formats[@]}"; do
     out="$base.$ext"
+    # A single doc's org output goes to the clipboard instead of a file.
+    if [[ $ext == org && ${#incoming[@]} -eq 1 ]]; then
+      if jiradoc2org "$doc" | pbcopy; then
+        echo "Copied org output to clipboard: $doc"
+      else
+        all_present=false
+      fi
+      continue
+    fi
     if [[ -e "$out" ]]; then
       echo "Already exists, skipping: $out"
       continue
