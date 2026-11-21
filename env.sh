@@ -33,6 +33,10 @@ alias wget="wget --hsts-file=${XDG_CACHE_HOME}/wget/history"
 alias bash="bash --init-file ${XDG_CONFIG_HOME}/bash/bashrc"
 
 # ----- Aliases: miscellaneous -----
+alias b=bundle
+alias clma='colima start --vm-type vz --mount-type virtiofs --vz-rosetta --cpu 8 --memory 12 --disk 100'
+
+# ----- Aliases: configuration variants -----
 alias vi='vim -u $XDG_CONFIG_HOME/vim/vimrc.minimal.vim'
 alias vin='vim -u NONE'
 
