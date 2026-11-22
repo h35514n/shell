@@ -60,9 +60,11 @@ Rules:
 Subject Line:
 
 - Max 50 chars long.
-- Begins with a capital letter after a prefix tag.
 - Includes a prefix of the form "prefix:" / "prefix(topic):", falling back to "misc(topic):".
-- Examples: "fix:", "feat:", "feat(shell):", "docs:", "refactor(emacs):", etc.
+    - Examples: "fix:", "feat:", "feat(shell):", "docs:", "refactor(emacs):", etc.
+- Begins with a capital letter after a prefix tag.
+    - Example: "feat(shell): Add library"
+    - Non-Example: feat(shell): add library"
 
 Body:
 
