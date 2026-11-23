@@ -34,7 +34,7 @@ if [[ $selected_branch =~ ^remotes ]]; then
   remote_branch="${selected_branch#remotes\/}"
   local_branch="$(echo "$remote_branch" | sed -e 's/\w\+\///')"
 
-  git checkout -b "$local_branch" "$remote_branch"
+  git switch -c "$local_branch"
 else
-  git checkout "$selected_branch"
+  git switch "$selected_branch"
 fi
