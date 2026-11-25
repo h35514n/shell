@@ -2,7 +2,8 @@
 # Move Jira .doc exports from ~/Downloads into the tickets directory, convert
 # each to .md, .org, and .jira, then trash the .doc. Never overwrite files.
 # Only files that were in ~/Downloads at start are processed. When there is
-# only one, its org output goes to the clipboard instead of a file.
+# only one, its org output goes to the clipboard instead of a file. With no
+# args and only one doc, formats default to md and org.
 set -euo pipefail
 shopt -s nullglob
 
@@ -12,7 +13,8 @@ usage() {
 }
 
 formats=("$@")
-[[ ${#formats[@]} -eq 0 ]] && formats=(md)
+no_args=false
+[[ ${#formats[@]} -eq 0 ]] && no_args=true && formats=(md)
 for f in "${formats[@]}"; do
   case "$f" in
     md|org|jira) ;;
@@ -27,6 +29,10 @@ mkdir -p "$DEST_DIR"
 
 # Step 1: move .doc files
 incoming=("$SRC_DIR"/*.doc)
+# With no args and a single doc, also copy the org output to the clipboard.
+if $no_args && [[ ${#incoming[@]} -eq 1 ]]; then
+  formats=(md org)
+fi
 for doc in "${incoming[@]}"; do
   target="$DEST_DIR/$(basename "$doc")"
   if [[ -e "$target" ]]; then
