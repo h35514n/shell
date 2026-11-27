@@ -16,18 +16,49 @@ if [[ "$1" =~ "--all" ]]; then
   git fetch
 fi
 
-# select a branch to switch to
-selected_branch="$(
-  git branch "$@" |
+export BRANCH_ARGS="$*"
+
+# Lines are "<ref><TAB><display>". Sorted by most recent commit.
+list_branches() {
+  # shellcheck disable=SC2086
+  git branch --sort=-committerdate $BRANCH_ARGS |
     grep -v '^+ ' |
     grep -v -e ' -> ' -e '(HEAD detached' |
     cut -c 3- |
-    awk '{ d = $0; if (match(d, /^remotes\/[^\/]+\//)) { r = substr(d, 9, RLENGTH - 9); d = "remote (" r "): " substr(d, RLENGTH + 1) } printf "%s\t%s\n", $0, d }' |
-    fzf --no-multi --delimiter=$'\t' --with-nth=2 \
-      --preview='printf "[%s]\n\n" {1} && git log --format=extended --color=always {1}' \
+    awk '{ d = $0; if (match(d, /^remotes\/[^\/]+\//)) { r = substr(d, 9, RLENGTH - 9); d = "remote (" r "): " substr(d, RLENGTH + 1) } printf "%s\t%s\n", $0, d }'
+}
+
+# Second fzf over a ref's commits. Esc returns to the branch list; a
+# selection is saved to $PICK_FILE and the branch picker then exits.
+pick_commit() {
+  git log --format='%h %s (%cr)' --color=always "$1" |
+    fzf --ansi --no-multi \
+      --preview='git show --stat --color=always {1}' \
       --preview-window=up,80% |
+    awk '{ print "commit:" $1 }' >"$PICK_FILE"
+}
+
+PICK_FILE="$(mktemp)"
+trap 'rm -f "$PICK_FILE"' EXIT
+export PICK_FILE
+export -f list_branches pick_commit
+
+# Keys: ctrl-l log, ctrl-d diff HEAD -> ref, ctrl-s diffstat HEAD -> ref,
+# ctrl-o pick a commit (detached switch), ctrl-f fetch and reload
+selected_branch="$(
+  SHELL="$(command -v bash)" list_branches |
+    SHELL="$(command -v bash)" fzf --no-multi --delimiter=$'\t' --with-nth=2 \
+      --header='ctrl-l log | ctrl-d diff | ctrl-s stat | ctrl-o commits | ctrl-f fetch' \
+      --preview='printf "[%s]\n\n" {1} && git log --format=extended --color=always {1}' \
+      --preview-window=up,80% \
+      --bind='ctrl-l:change-preview(printf "[%s]\n\n" {1} && git log --format=extended --color=always {1})' \
+      --bind='ctrl-d:change-preview(git diff --color=always HEAD {1})' \
+      --bind='ctrl-s:change-preview(git diff --stat --color=always HEAD {1})' \
+      --bind='ctrl-o:execute(pick_commit {1})+transform([[ -s "$PICK_FILE" ]] && echo abort)' \
+      --bind='ctrl-f:reload(git fetch --quiet; list_branches)' |
     cut -f1
 )"
+[[ -s $PICK_FILE ]] && selected_branch="$(<"$PICK_FILE")"
 
 current_head="$(git rev-parse --abbrev-ref HEAD)"
 
@@ -35,7 +66,9 @@ if [[ -z $selected_branch || $selected_branch == "$current_head" ]]; then
   exit 0
 fi
 
-if [[ $selected_branch =~ ^remotes ]]; then
+if [[ $selected_branch == commit:* ]]; then
+  git switch --detach "${selected_branch#commit:}"
+elif [[ $selected_branch =~ ^remotes ]]; then
   remote_branch="${selected_branch#remotes\/}"
   local_branch="${remote_branch#*/}"
 
