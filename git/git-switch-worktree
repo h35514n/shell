@@ -1,0 +1,63 @@
+#!/usr/bin/env bash
+
+# Displays worktrees for fuzzy selection, then opens a shell in the selected
+# worktree. The current worktree is excluded.
+#
+# A script cannot change the directory of the calling shell. Use --print to
+# print the selected path instead, for example:
+#   cd "$(git switch-worktree --print)"
+#
+# Dependencies: fzf (install using homebrew)
+#
+# Examples:
+#   git switch-worktree
+#   git switch-worktree --print
+
+print_only=false
+[[ "$1" == "--print" ]] && print_only=true
+
+current_path="$(git rev-parse --show-toplevel)"
+
+# Each line is "<path><TAB><name>  [<branch>]<TAB><~/path [branch]>"; fzf lists
+# the second field and uses the third as the preview headline
+selected="$(
+  git worktree list --porcelain |
+    awk -v current="$current_path" -v home="$HOME" '
+      function add() {
+        if (path == "" || path == current) return
+        n++
+        paths[n] = path
+        split(path, parts, "/")
+        names[n] = parts[length(parts)]
+        labels[n] = label
+        if (length(names[n]) > width) width = length(names[n])
+      }
+      /^worktree / { add(); path = substr($0, 10); label = "(unknown)" }
+      /^branch /   { label = substr($0, 8); sub("^refs/heads/", "", label) }
+      /^detached/  { label = "detached" }
+      /^bare/      { label = "bare" }
+      END {
+        add()
+        for (i = 1; i <= n; i++) {
+          full = paths[i]
+          if (index(full, home "/") == 1) full = "~" substr(full, length(home) + 1)
+          printf "%s\t%-*s [%s]\t%s [%s]\n", paths[i], width, names[i], labels[i], full, labels[i]
+        }
+      }
+    ' |
+    fzf --no-multi --delimiter=$'\t' --with-nth=2 \
+      --preview='printf "%s\n\n" {3} && git -C {1} log --format=extended --color=always -n 20' \
+      --preview-window=up,80%
+)"
+
+if [[ -z $selected ]]; then
+  exit 0
+fi
+
+selected_path="${selected%%$'\t'*}"
+
+if $print_only; then
+  echo "$selected_path"
+else
+  cd "$selected_path" && exec "${SHELL:-/bin/bash}"
+fi
