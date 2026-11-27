@@ -33,12 +33,15 @@ def cli(description, convert, suffix):
     ap.add_argument("input", type=Path, help="Jira export (.doc)")
     ap.add_argument("-f", "--file", action="store_true",
                     help=f"write {suffix} file next to input instead of STDOUT")
+    ap.add_argument("-v", "--verbose", action="store_true",
+                    help="report the written file on STDERR")
     args = ap.parse_args()
     content = convert(parse(args.input))
     if args.file:
         out = args.input.with_suffix(suffix)
         out.write_text(content, encoding="utf-8")
-        print(f"Wrote {out}", file=sys.stderr)
+        if args.verbose:
+            print(f"Wrote {out}", file=sys.stderr)
     else:
         sys.stdout.write(content)
 

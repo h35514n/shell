@@ -3,18 +3,24 @@
 # each to .md, .org, and .jira, then trash the .doc. Never overwrite files.
 # Only files that were in ~/Downloads at start are processed. When there is
 # only one, its org output goes to the clipboard instead of a file. With no
-# args and only one doc, formats default to md and org.
+# args, formats default to md and org, for one doc or many.
+# Output is one line per ticket; pass -v for per-step detail.
 set -euo pipefail
 shopt -s nullglob
 
 usage() {
-  echo "Usage: ${0##*/} [md] [org] [jira]   (default: md)" >&2
+  echo "Usage: ${0##*/} [-v] [md] [org] [jira]   (default: md org)" >&2
   exit 1
 }
 
-formats=("$@")
-no_args=false
-[[ ${#formats[@]} -eq 0 ]] && no_args=true && formats=(md)
+verbose=false
+args=()
+for a in "$@"; do
+  if [[ $a == -v ]]; then verbose=true; else args+=("$a"); fi
+done
+
+formats=(${args[@]+"${args[@]}"})
+[[ ${#formats[@]} -eq 0 ]] && formats=(md org)
 for f in "${formats[@]}"; do
   case "$f" in
     md|org|jira) ;;
@@ -25,54 +31,79 @@ done
 SRC_DIR="$HOME/Downloads"
 DEST_DIR="/Users/jromer/Knowledge/work/tickets"
 
+log() { $verbose && echo "$@" || true; }
+
 mkdir -p "$DEST_DIR"
 
-# Step 1: move .doc files
 incoming=("$SRC_DIR"/*.doc)
-# With no args and a single doc, also copy the org output to the clipboard.
-if $no_args && [[ ${#incoming[@]} -eq 1 ]]; then
-  formats=(md org)
+if [[ ${#incoming[@]} -eq 0 ]]; then
+  echo "No .doc files in ${SRC_DIR/#$HOME/~}"
+  exit 0
 fi
+
+# Step 1: move .doc files
 for doc in "${incoming[@]}"; do
   target="$DEST_DIR/$(basename "$doc")"
   if [[ -e "$target" ]]; then
-    echo "Already exists, skipping move: $target"
+    log "Already exists, skipping move: $target"
     continue
   fi
   mv -n "$doc" "$target"
-  echo "Moved: $doc -> $target"
+  log "Moved: $doc -> $target"
 done
 
 # Step 2: convert each incoming .doc, then trash it once all outputs exist
+failed=0
 for src in "${incoming[@]}"; do
-  doc="$DEST_DIR/$(basename "$src")"
+  name="$(basename "$src" .doc)"
+  doc="$DEST_DIR/$name.doc"
   [[ -e "$doc" ]] || continue
   base="${doc%.doc}"
   all_present=true
+  done_fmts=()
+  notes=()
   for ext in "${formats[@]}"; do
     out="$base.$ext"
     # A single doc's org output goes to the clipboard instead of a file.
     if [[ $ext == org && ${#incoming[@]} -eq 1 ]]; then
       if jiradoc2org "$doc" | pbcopy; then
-        echo "Copied org output to clipboard: $doc"
+        done_fmts+=("org->clipboard")
       else
         all_present=false
+        notes+=("org FAILED")
       fi
       continue
     fi
     if [[ -e "$out" ]]; then
-      echo "Already exists, skipping: $out"
+      notes+=("$ext exists, skipped")
       continue
     fi
-    "jiradoc2$ext" -f "$doc"
-    echo "Created: $out"
-    [[ -e "$out" ]] || all_present=false
+    if $verbose; then
+      "jiradoc2$ext" -v -f "$doc" || true
+    else
+      "jiradoc2$ext" -f "$doc" || true
+    fi
+    if [[ -e "$out" ]]; then
+      done_fmts+=("$ext")
+    else
+      all_present=false
+      notes+=("$ext FAILED")
+    fi
   done
 
   if $all_present; then
     trash "$doc"
-    echo "Trashed: $doc"
+    status=ok
   else
-    echo "Keeping $doc: not all outputs exist"
+    status="FAILED (kept $name.doc)"
+    failed=$((failed + 1))
   fi
+  line="$(printf '%-10s %s' "$name" "${done_fmts[*]-}")"
+  [[ ${#notes[@]} -gt 0 ]] && line+="  [$(IFS=';'; echo "${notes[*]}")]"
+  line+="  $status"
+  if $all_present; then echo "$line"; else echo "$line" >&2; fi
 done
+
+echo "${#incoming[@]} ticket(s) -> ${DEST_DIR/#$HOME/~}"
+[[ $failed -eq 0 ]] || exit 1
+
