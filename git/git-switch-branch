@@ -22,9 +22,11 @@ selected_branch="$(
     grep -v '^+ ' |
     grep -v -e ' -> ' -e '(HEAD detached' |
     cut -c 3- |
-    fzf --no-multi \
-      --preview='printf "[%s]\n\n" {+1} && git log --format=extended --color=always {+1}' \
-      --preview-window=right,80%
+    awk '{ d = $0; if (match(d, /^remotes\/[^\/]+\//)) { r = substr(d, 9, RLENGTH - 9); d = "remote (" r "): " substr(d, RLENGTH + 1) } printf "%s\t%s\n", $0, d }' |
+    fzf --no-multi --delimiter=$'\t' --with-nth=2 \
+      --preview='printf "[%s]\n\n" {1} && git log --format=extended --color=always {1}' \
+      --preview-window=up,80% |
+    cut -f1
 )"
 
 current_head="$(git rev-parse --abbrev-ref HEAD)"
